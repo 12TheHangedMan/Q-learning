@@ -120,35 +120,35 @@ def hash(obs):
 """
 Complete the function below to do the following:
 
-		1. Run a specified number of episodes of the game (argument num_episodes). An episode refers to starting in some initial
-			 configuration and taking actions until a terminal state is reached.
-		2. Maintain and update Q-values for each state-action pair encountered by the agent in a dictionary (Q-table).
-		3. Use epsilon-greedy action selection when choosing actions (explore vs exploit).
-		4. Update Q-values using the standard Q-learning update rule.
+        1. Run a specified number of episodes of the game (argument num_episodes). An episode refers to starting in some initial
+             configuration and taking actions until a terminal state is reached.
+        2. Maintain and update Q-values for each state-action pair encountered by the agent in a dictionary (Q-table).
+        3. Use epsilon-greedy action selection when choosing actions (explore vs exploit).
+        4. Update Q-values using the standard Q-learning update rule.
 
 Important notes about the current environment and state representation
 
-		- The environment is partially observable: observations returned by env.get_observation() include a centered 3x3
-			"window" around the player plus the player's health. Each observation is a dict with these relevant keys:
-					- 'player_position': (x, y)
-					- 'player_health': integer (0=Critical, 1=Injured, 2=Full)
-					- 'window': a dict keyed by (dx,dy) offsets in {-1,0,1} x {-1,0,1}. Each entry contains:
-								{ 'guards': list or None, 'is_trap': bool, 'is_heal': bool, 'is_goal': bool, 'in_bounds': bool }
-					- 'at_trap', 'at_heal', 'at_goal', and 'guard_in_cell' are convenience fields for the center cell.
+        - The environment is partially observable: observations returned by env.get_observation() include a centered 3x3
+            "window" around the player plus the player's health. Each observation is a dict with these relevant keys:
+                    - 'player_position': (x, y)
+                    - 'player_health': integer (0=Critical, 1=Injured, 2=Full)
+                    - 'window': a dict keyed by (dx,dy) offsets in {-1,0,1} x {-1,0,1}. Each entry contains:
+                                { 'guards': list or None, 'is_trap': bool, 'is_heal': bool, 'is_goal': bool, 'in_bounds': bool }
+                    - 'at_trap', 'at_heal', 'at_goal', and 'guard_in_cell' are convenience fields for the center cell.
 
-		- To make a compact and consistent state hash for tabular Q-learning, encode the 3x3 window plus player health into a single integer.
-			use the provided hash(obs) function above. Note that the player position is not included in the hash, as it is not needed for local decision-making.
+        - To make a compact and consistent state hash for tabular Q-learning, encode the 3x3 window plus player health into a single integer.
+            use the provided hash(obs) function above. Note that the player position is not included in the hash, as it is not needed for local decision-making.
 
-		- Your Q-table should be a dict mapping state_id -> np.array of length env.action_space.n. Initialize arrays to zeros
-			when you first encounter a state.
+        - Your Q-table should be a dict mapping state_id -> np.array of length env.action_space.n. Initialize arrays to zeros
+            when you first encounter a state.
 
-		- The actions available in this environment now include movement, combat, healing and waiting. The action indices are:
-					0: UP, 1: DOWN, 2: LEFT, 3: RIGHT, 4: FIGHT, 5: HIDE, 6: HEAL, 7: WAIT
+        - The actions available in this environment now include movement, combat, healing and waiting. The action indices are:
+                    0: UP, 1: DOWN, 2: LEFT, 3: RIGHT, 4: FIGHT, 5: HIDE, 6: HEAL, 7: WAIT
 
-		- Remember to call obs, reward, done, info = env.reset() at the start of each episode.
+        - Remember to call obs, reward, done, info = env.reset() at the start of each episode.
 
-		- Use a learning-rate schedule per (s,a) pair, i.e. eta = 1/(1 + N(s,a)) where N(s,a) is the
-			number of updates applied to that pair so far.
+        - Use a learning-rate schedule per (s,a) pair, i.e. eta = 1/(1 + N(s,a)) where N(s,a) is the
+            number of updates applied to that pair so far.
 
 Finally, return the dictionary containing the Q-values (called Q_table).
 
@@ -169,6 +169,8 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
     - Q_table (dict): Dictionary containing the Q-values for each state-action pair.
     """
     Q_table = {}
+    updates_to_Qsa = {}
+    rewards = []
 
     # YOUR CODE HERE
     for episode in tqdm(range(num_episodes)):
@@ -179,9 +181,6 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
         # initialize Q-values for new states
         if state_id not in Q_table:
             Q_table[state_id] = np.zeros(env.action_space.n)
-
-        updates_to_Qsa = {}
-        rewards = []
 
         while not end_game:
             # epsilon-greedy action
@@ -194,7 +193,7 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
                 action = np.random.choice(local_action_space)
 
             # take the action and observe the new state and reward
-            new_state, reward, end_game, info = env.step(action)
+            new_state, new_reward, end_game, info = env.step(action)
             new_state_id = hash(new_state)
 
             # initialize Q-values for new states
@@ -206,15 +205,16 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
                 Q_table[new_state_id]
             )  # max Q-value for the next state
 
-            num_of_updates = updates_to_Qsa.get((new_state_id, action), -1) + 1
-            updates_to_Qsa[(new_state_id, action)] = num_of_updates
+            num_of_updates = updates_to_Qsa.get((state_id, action), -1) + 1
+            updates_to_Qsa[(state_id, action)] = num_of_updates
 
             # update rule with learning rate schedule
             Q_table[state_id][action] += (1 / (1 + num_of_updates)) * (
-                reward + gamma * best_next_q - Q_table[state_id][action]
+                new_reward + gamma * best_next_q - Q_table[state_id][action]
             )
             # move to the new state
             state_id = new_state_id
+            reward += new_reward
 
         # epsilon decays
         epsilon *= decay_rate
@@ -239,8 +239,12 @@ if train_flag:
     Q_table, rewards = Q_learning(
         num_episodes=num_episodes, gamma=0.9, epsilon=1, decay_rate=decay_rate
     )  # Run Q-learning
-    
-    plt.hist(rewards, bins=50)
+
+    plt.figure(figsize=(10,5))
+    plt.plot(rewards[9900:10000])
+    plt.xlabel("Episode")
+    plt.ylabel("Total Reward")
+    plt.title("Reward per Episode")
     plt.show()
 
     # Save the Q-table dict to a file
