@@ -5,21 +5,24 @@ import numpy as np
 from tqdm import tqdm
 from vis_gym import *
 
+import matplotlib.pyplot as plt
+
 # upload zipfile called upload.zip
 
-BOLD = '\033[1m'  # ANSI escape sequence for bold text
-RESET = '\033[0m' # ANSI escape sequence to reset text formatting
+BOLD = "\033[1m"  # ANSI escape sequence for bold text
+RESET = "\033[0m"  # ANSI escape sequence to reset text formatting
 
-train_flag = 'train' in sys.argv
-gui_flag = 'gui' in sys.argv
+train_flag = "train" in sys.argv
+gui_flag = "gui" in sys.argv
 
 setup(GUI=gui_flag)
-env = game # Gym environment already initialized within vis_gym.py
+env = game  # Gym environment already initialized within vis_gym.py
 
-env.render() # Uncomment to print game state info
+env.render()  # Uncomment to print game state info
+
 
 def hash(obs):
-	'''
+    """
     Compute a unique compact integer ID representing the given observation.
 
     Encoding scheme:
@@ -31,7 +34,7 @@ def hash(obs):
       - Each cell contributes a single digit (0–8) to a base-9 number:
           * If the cell is out of bounds → code = 8
           * Otherwise:
-                tile_type = 
+                tile_type =
                     0 → empty
                     1 → trap
                     2 → heal
@@ -51,67 +54,70 @@ def hash(obs):
             GUARD_SPACE  = WINDOW_SPACE       # for guard_index (0–4)
             HEALTH_SPACE = GUARD_SPACE * 5    # for health (0–2)
 
-            state_id = (player_health * HEALTH_SPACE) 
-                     + (guard_index * GUARD_SPACE) 
+            state_id = (player_health * HEALTH_SPACE)
+                     + (guard_index * GUARD_SPACE)
                      + window_hash
 
     Returns:
         int: A unique, compact integer ID suitable for tabular RL (e.g. as a Q-table key).
-    '''
-	health = int(obs.get('player_health', 0))
-	window = obs.get('window', {})
+    """
+    health = int(obs.get("player_health", 0))
+    window = obs.get("window", {})
 
-	# Build cell values in a stable order: dx -1..1 (rows), dy -1..1 (cols)
-	cell_values = []
-	for dx in [-1, 0, 1]:
-		for dy in [-1, 0, 1]:
-			cell = window.get((dx, dy))
-			if cell is None or not cell.get('in_bounds', False):
-				cell_values.append(8)
-				continue
+    # Build cell values in a stable order: dx -1..1 (rows), dy -1..1 (cols)
+    cell_values = []
+    for dx in [-1, 0, 1]:
+        for dy in [-1, 0, 1]:
+            cell = window.get((dx, dy))
+            if cell is None or not cell.get("in_bounds", False):
+                cell_values.append(8)
+                continue
 
-			# Determine tile type
-			if cell.get('is_trap'):
-				tile_type = 1
-			elif cell.get('is_heal'):
-				tile_type = 2
-			elif cell.get('is_goal'):
-				tile_type = 3
-			else:
-				tile_type = 0
+            # Determine tile type
+            if cell.get("is_trap"):
+                tile_type = 1
+            elif cell.get("is_heal"):
+                tile_type = 2
+            elif cell.get("is_goal"):
+                tile_type = 3
+            else:
+                tile_type = 0
 
-			has_guard = 1 if cell.get('guards') else 0
-			cell_value = has_guard * 4 + tile_type
-			cell_values.append(cell_value)
+            has_guard = 1 if cell.get("guards") else 0
+            cell_value = has_guard * 4 + tile_type
+            cell_values.append(cell_value)
 
-	# Pack into base-9 integer
-	window_hash = 0
-	base = 1
-	for v in cell_values:
-		window_hash += v * base
-		base *= 9
+    # Pack into base-9 integer
+    window_hash = 0
+    base = 1
+    for v in cell_values:
+        window_hash += v * base
+        base *= 9
 
-	# Include guard identity when player is in the center cell.
-	# guard_in_cell is a convenience field set by the environment (e.g. 'G1' or None).
-	guard_in_cell = obs.get('guard_in_cell')
-	if guard_in_cell:
-		# map 'G1' -> 1, 'G2' -> 2, etc.
-		try:
-			guard_index = int(str(guard_in_cell)[-1])
-		except Exception:
-			guard_index = 0
-	else:
-		guard_index = 0
+    # Include guard identity when player is in the center cell.
+    # guard_in_cell is a convenience field set by the environment (e.g. 'G1' or None).
+    guard_in_cell = obs.get("guard_in_cell")
+    if guard_in_cell:
+        # map 'G1' -> 1, 'G2' -> 2, etc.
+        try:
+            guard_index = int(str(guard_in_cell)[-1])
+        except Exception:
+            guard_index = 0
+    else:
+        guard_index = 0
 
-	# window_hash uses 9^9 space; reserve an extra multiplier for guard identity (0..4)
-	WINDOW_SPACE = 9 ** 9
-	GUARD_SPACE = WINDOW_SPACE  # one slot per guard id
-	HEALTH_SPACE = GUARD_SPACE * 5  # 5 possible guard_id values (0 = none, 1-4 = guards)
+    # window_hash uses 9^9 space; reserve an extra multiplier for guard identity (0..4)
+    WINDOW_SPACE = 9**9
+    GUARD_SPACE = WINDOW_SPACE  # one slot per guard id
+    HEALTH_SPACE = (
+        GUARD_SPACE * 5
+    )  # 5 possible guard_id values (0 = none, 1-4 = guards)
 
-	state_id = int(health) * HEALTH_SPACE + int(guard_index) * GUARD_SPACE + window_hash
-	return state_id
+    state_id = int(health) * HEALTH_SPACE + int(guard_index) * GUARD_SPACE + window_hash
+    return state_id
 
-'''
+
+"""
 Complete the function below to do the following:
 
 		1. Run a specified number of episodes of the game (argument num_episodes). An episode refers to starting in some initial
@@ -146,11 +152,12 @@ Important notes about the current environment and state representation
 
 Finally, return the dictionary containing the Q-values (called Q_table).
 
-'''
+"""
+
 
 def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
-	"""
-	Run Q-learning algorithm for a specified number of episodes.
+    """
+        Run Q-learning algorithm for a specified number of episodes.
 
     Parameters:
     - num_episodes (int): Number of episodes to run.
@@ -161,96 +168,134 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
     Returns:
     - Q_table (dict): Dictionary containing the Q-values for each state-action pair.
     """
-	Q_table = {}
+    Q_table = {}
 
-	# YOUR CODE HERE
-	for episode in tqdm(range(num_episodes)):
-		obs, reward, end_game, info = env.reset()
-		state_id = hash(obs)
+    # YOUR CODE HERE
+    for episode in tqdm(range(num_episodes)):
+        # initialize the game
+        state, reward, end_game, info = env.reset()
+        state_id = hash(state)
 
-		while not end_game:
-			if state_id not in Q_table:
-				Q_table[state_id] = np.zeros(env.action_space.n)  # Initialize Q-values for new states
+        # initialize Q-values for new states
+        if state_id not in Q_table:
+            Q_table[state_id] = np.zeros(env.action_space.n)
 
-			# Epsilon-greedy action selection
-			if np.random.rand() < epsilon:
-				action = env.action_space.sample()  # Explore: select a random action
-			else:
-				action = np.argmax(Q_table[state_id])  # Exploit: select the action with max Q-value
+        updates_to_Qsa = {}
+        rewards = []
 
-			# Take the action and observe the new state and reward
-			new_obs, new_reward, end_game, info = env.step(action)
-			new_state_id = hash(new_obs)
+        while not end_game:
+            # epsilon-greedy action
+            action = env.action_space.sample()  # take random action
 
-			if new_state_id not in Q_table:
-				Q_table[new_state_id] = np.zeros(env.action_space.n)  # Initialize Q-values for new states
+            if np.random.rand() >= epsilon:
+                max_Q = np.max(Q_table[state_id])
+                # take out the action with max Q-value
+                local_action_space = np.where(Q_table[state_id] == max_Q)[0]
+                action = np.random.choice(local_action_space)
 
-			# Q-learning update
-			best_next_q = np.max(Q_table[new_state_id])  # Max Q-value for the next state
-			Q_table[state_id][action] += (1 / (1 + episode)) * (new_reward + gamma * best_next_q - Q_table[state_id][action])  # Update rule with learning rate schedule
+            # take the action and observe the new state and reward
+            new_state, reward, end_game, info = env.step(action)
+            new_state_id = hash(new_state)
 
-			state_id = new_state_id  # Move to the next state
+            # initialize Q-values for new states
+            if new_state_id not in Q_table:
+                Q_table[new_state_id] = np.zeros(env.action_space.n)
 
-		epsilon *= decay_rate  # Decay epsilon after each episode
+            # Q-learning update
+            best_next_q = np.max(
+                Q_table[new_state_id]
+            )  # max Q-value for the next state
+
+            num_of_updates = updates_to_Qsa.get((new_state_id, action), -1) + 1
+            updates_to_Qsa[(new_state_id, action)] = num_of_updates
+
+            # update rule with learning rate schedule
+            Q_table[state_id][action] += (1 / (1 + num_of_updates)) * (
+                reward + gamma * best_next_q - Q_table[state_id][action]
+            )
+            # move to the new state
+            state_id = new_state_id
+
+        # epsilon decays
+        epsilon *= decay_rate
+
+        rewards.append(reward)
+
+    return Q_table, rewards
 
 
-	return Q_table
-
-'''
+"""
 Specify number of episodes and decay rate for training and evaluation.
-'''
+"""
 
-num_episodes = 20000
+num_episodes = 10000
 decay_rate = 0.999
 
-'''
+"""
 Run training if train_flag is set; otherwise, run evaluation using saved Q-table.
-'''
+"""
 
 if train_flag:
-	Q_table = Q_learning(num_episodes=num_episodes, gamma=0.9, epsilon=1, decay_rate=decay_rate) # Run Q-learning
+    Q_table, rewards = Q_learning(
+        num_episodes=num_episodes, gamma=0.9, epsilon=1, decay_rate=decay_rate
+    )  # Run Q-learning
+    
+    plt.hist(rewards, bins=50)
+    plt.show()
 
-	# Save the Q-table dict to a file
-	with open('Q_table_.pickle', 'wb') as handle:
-		pickle.dump(Q_table, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    # Save the Q-table dict to a file
+    with open("Q_table.pickle", "wb") as handle:
+        pickle.dump(Q_table, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-'''
+"""
 Evaluation mode: play episodes using the saved Q-table. Useful for debugging/visualization.
 Based on autograder logic used to execute actions using uploaded Q-tables.
-'''
+"""
+
 
 def softmax(x, temp=1.0):
-	e_x = np.exp((x - np.max(x)) / temp)
-	return e_x / e_x.sum(axis=0)
+    e_x = np.exp((x - np.max(x)) / temp)
+    return e_x / e_x.sum(axis=0)
+
 
 if not train_flag:
-	
-	rewards = []
 
-	filename = 'Q_table_.pickle'
-	input(f"\n{BOLD}Currently loading Q-table from "+filename+f"{RESET}.  \n\nPress Enter to confirm, or Ctrl+C to cancel and load a different Q-table file.\n(set num_episodes and decay_rate in Q_learning.py).")
-	Q_table = np.load(filename, allow_pickle=True)
+    rewards = []
 
-	for episode in tqdm(range(10000)):
-		obs, reward, done, info = env.reset()
-		total_reward = 0
-		
-		while not done:
-			state = hash(obs)
-			try:
-				action = np.random.choice(env.action_space.n, p=softmax(Q_table[state]))  # Select action using softmax over Q-values
-			except KeyError:
-				action = env.action_space.sample()  # Fallback to random action if state not in Q-table
-			
-			obs, reward, done, info = env.step(action)
-			
-			total_reward += reward
-			if gui_flag:
-				refresh(obs, reward, done, info, delay=.1)  # Update the game screen [GUI only]
+    filename = "Q_table.pickle"
+    input(
+        f"\n{BOLD}Currently loading Q-table from "
+        + filename
+        + f"{RESET}.  \n\nPress Enter to confirm, or Ctrl+C to cancel and load a different Q-table file.\n(set num_episodes and decay_rate in Q_learning.py)."
+    )
+    Q_table = np.load(filename, allow_pickle=True)
 
-		#print("Total reward:", total_reward)
-		rewards.append(total_reward)
-	avg_reward = sum(rewards)/len(rewards)
+    for episode in tqdm(range(10000)):
+        obs, reward, done, info = env.reset()
+        total_reward = 0
 
-	print(f"\n{BOLD}Average reward over 10000 episodes: {avg_reward:.2f}{RESET}")
+        while not done:
+            state = hash(obs)
+            try:
+                action = np.random.choice(
+                    env.action_space.n, p=softmax(Q_table[state])
+                )  # Select action using softmax over Q-values
+            except KeyError:
+                action = (
+                    env.action_space.sample()
+                )  # Fallback to random action if state not in Q-table
+
+            obs, reward, done, info = env.step(action)
+
+            total_reward += reward
+            if gui_flag:
+                refresh(
+                    obs, reward, done, info, delay=0.1
+                )  # Update the game screen [GUI only]
+
+        # print("Total reward:", total_reward)
+        rewards.append(total_reward)
+    avg_reward = sum(rewards) / len(rewards)
+
+    print(f"\n{BOLD}Average reward over 10000 episodes: {avg_reward:.2f}{RESET}")
