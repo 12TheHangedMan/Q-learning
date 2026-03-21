@@ -228,8 +228,8 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
 Specify number of episodes and decay rate for training and evaluation.
 """
 
-num_episodes = 10000
-decay_rate = 0.999
+num_episodes = 160000
+decay_rate = 0.99999
 
 """
 Run training if train_flag is set; otherwise, run evaluation using saved Q-table.
@@ -240,11 +240,16 @@ if train_flag:
         num_episodes=num_episodes, gamma=0.9, epsilon=1, decay_rate=decay_rate
     )  # Run Q-learning
 
+    fold_size = 1000
+    folds = len(rewards) // fold_size
+    avg_rewards = [np.mean(rewards[i * fold_size : (i + 1) * fold_size]) for i in range(folds)]
+
     plt.figure(figsize=(10,5))
-    plt.plot(rewards[9900:10000])
-    plt.xlabel("Episode")
-    plt.ylabel("Total Reward")
-    plt.title("Reward per Episode")
+    plt.plot(range(folds), avg_rewards, marker='o')
+    plt.xlabel("Fold")
+    plt.ylabel("Average Reward")
+    plt.title("Average Reward per Fold of Episodes")
+    plt.xticks(range(folds))
     plt.show()
 
     # Save the Q-table dict to a file
