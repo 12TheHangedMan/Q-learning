@@ -4,6 +4,8 @@ import numpy as np
 
 SPECIAL_CELL_STATES = ["at_heal", "guard_in_cell"]
 
+SPECIAL_CASES = ["at_heal", "G1", "G2", "G3", "G4"]
+
 
 class Evaluator:
     def __init__(self):
