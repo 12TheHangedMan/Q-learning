@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from mdp_gym import CastleEscapeEnv
 
 SPECIAL_CASES = ["at_heal", "G1", "G2", "G3", "G4"]
 ACTIONS = ["UP", "DOWN", "LEFT", "RIGHT", "FIGHT", "HIDE", "HEAL", "WAIT"]
@@ -9,24 +8,17 @@ ACTIONS = ["UP", "DOWN", "LEFT", "RIGHT", "FIGHT", "HIDE", "HEAL", "WAIT"]
 
 class Evaluator:
     def __init__(self):
+        self.evaluator_reset()
+
+    def evaluator_reset(self):
         self.decay_rate = 0
         self.total_training_episodes = 0
         self.training_q_table = {}
         self.new_states = set()
         self.rewards = []
+        self.special_cell_summery = {}
         self.state_count = {}
         self.state_category = {}
-        # self.evaluator_reset()
-
-    # def evaluator_reset(self):
-    #     self.decay_rate = 0
-    #     self.total_training_episodes = 0
-    #     self.training_q_table = {}
-    #     self.new_states = set()
-    #     self.rewards = []
-    #     self.special_cell_summery = {}
-    #     self.state_count = {}
-    #     self.state_category = {}
 
     def record_decay_rate(self, decay_rate: float) -> None:
         self.decay_rate = decay_rate
