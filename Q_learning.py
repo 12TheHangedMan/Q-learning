@@ -12,8 +12,6 @@ from Q_learning_evaluator import Evaluator
 BOLD = "\033[1m"  # ANSI escape sequence for bold text
 RESET = "\033[0m"  # ANSI escape sequence to reset text formatting
 
-SPECIAL_CASES = ["at_heal", "G1", "G2", "G3", "G4"]
-
 train_flag = "train" in sys.argv
 gui_flag = "gui" in sys.argv
 
@@ -175,7 +173,8 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
     Q_table = {}
     updates_to_Qsa = {}
 
-    special_cases_Q_tables = {}
+    state_count = {}
+    state_category = {}
 
     evaluator.record_decay_rate(decay_rate)
     evaluator.record_total_training_episodes(num_episodes)
@@ -209,9 +208,12 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
                 Q_table[new_state_id] = np.zeros(env.action_space.n)
 
             # Q-learning update
-            best_next_q = np.max(
-                Q_table[new_state_id]
-            )  # max Q-value for the next state
+            if end_game:
+                # no future rewards
+                best_next_q = 0
+            else:
+                # max Q-value for the next state
+                best_next_q = np.max(Q_table[new_state_id])
 
             num_of_updates = updates_to_Qsa.get((state_id, action), -1) + 1
             updates_to_Qsa[(state_id, action)] = num_of_updates
@@ -224,19 +226,14 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
             # test
             guard = state.get("guard_in_cell", None)
 
-            if guard:
-                special_cases_Q_tables[guard][state_id][action]["q"] = Q_table[state_id][action]
-                special_cases_Q_tables[guard][state_id][action]["count"] = special_cases_Q_tables[guard][state_id][action].get("count", 0) + 1
+            if guard or state["at_heal"]:
+                state_count[state_id] = state_count.get(state_id, 0) + 1
 
-            if state["at_heal"]:
-                special_cases_Q_tables["at_heal"][state_id][action]["q"] = Q_table[state_id][action]
-                special_cases_Q_tables["at_heal"][state_id][action]["count"] = special_cases_Q_tables["at_heal"][state_id][action].get("count", 0) + 1
-
-                evaluator.record_special_cell_counts("at_heal")
-
-            if state["guard_in_cell"]:
-                guard_name = new_state["guard_in_cell"]
-                evaluator.record_special_cell_counts(guard_name)
+            if state_id not in state_category:
+                if guard:
+                    state_category[state_id] = guard
+                elif state["at_heal"]:
+                    state_category[state_id] = "at_heal"
 
             # move to the new state
             state_id = new_state_id
@@ -248,6 +245,8 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
         epsilon *= decay_rate
         evaluator.records_rewards_during_training(reward)
 
+    evaluator.record_state_count(state_count)
+    evaluator.record_state_category(state_category)
     evaluator.record_q_table(Q_table)
 
     return Q_table
@@ -331,9 +330,5 @@ if not train_flag:
 
 # evaluator.plot_episode_reward_line_chart()
 print(evaluator.report_new_states_count())
-
-special_cell_summery = evaluator.report_special_cell_summery()
-for key in special_cell_summery:
-    print(f"{key}: {special_cell_summery[key]}")
-
 evaluator.plot_episode_reward_line_chart()
+evaluator.report_summary()
