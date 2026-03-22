@@ -244,7 +244,7 @@ Specify number of episodes and decay rate for training and evaluation.
 """
 
 num_episodes = 1000
-decay_rate = 0.99999
+decay_rate = 0.9999
 
 """
 Run training if train_flag is set; otherwise, run evaluation using saved Q-table.
@@ -317,6 +317,7 @@ if not train_flag:
 
 # evaluator.plot_episode_reward_line_chart()
 print(evaluator.report_new_states_count())
+
 special_cell_summery = evaluator.report_special_cell_summery()
 for key in special_cell_summery:
     print(f"{key}: {special_cell_summery[key]}")

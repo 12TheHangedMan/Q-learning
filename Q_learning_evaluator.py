@@ -42,20 +42,41 @@ class Evaluator:
     def records_rewards_during_training(self, reward: float) -> None:
         self.rewards.append(reward)
 
-    def plot_episode_reward_line_chart(self, fold_size=100) -> None:
-        folds = len(self.rewards) // fold_size
-        avg_rewards = [
-            np.mean(self.rewards[i * fold_size : (i + 1) * fold_size])
+    def plot_episode_reward_line_chart(self, fold_size=500) -> None:
+        rewards = self.rewards
+        folds = len(rewards) // fold_size
+
+
+        # avg_rewards = [
+        #     np.mean(rewards[i * fold_size : (i + 1) * fold_size])
+        #     for i in range(folds)
+        # ]
+
+        # plt.figure(figsize=(10, 5))
+        # plt.plot(range(folds), avg_rewards, marker="o")
+        # plt.xlabel("Fold")
+        # plt.ylabel("Average Reward")
+        # plt.title("Average Reward per Fold of Episodes")
+        # plt.xticks(range(folds))
+        # plt.show()
+
+
+        reward_groups = [
+            rewards[i * fold_size : (i + 1) * fold_size]
             for i in range(folds)
         ]
 
-        plt.figure(figsize=(10, 5))
-        plt.plot(range(folds), avg_rewards, marker="o")
-        plt.xlabel("Fold")
-        plt.ylabel("Average Reward")
-        plt.title("Average Reward per Fold of Episodes")
-        plt.xticks(range(folds))
+        import matplotlib.pyplot as plt
+
+        plt.figure(figsize=(12,6))
+        plt.boxplot(reward_groups)
+
+        plt.xlabel("Episode Fold")
+        plt.ylabel("Reward")
+        plt.title("Reward Distribution per Fold")
+
         plt.show()
+
 
     # 5x8 table part
     def record_special_cell_counts(self, cell_state: str) -> None:
