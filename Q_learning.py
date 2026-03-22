@@ -5,7 +5,7 @@ import numpy as np
 from tqdm import tqdm
 from vis_gym import *
 
-import matplotlib.pyplot as plt
+from Q_learning_evaluator import Evaluator
 
 # upload zipfile called upload.zip
 
@@ -154,6 +154,8 @@ Finally, return the dictionary containing the Q-values (called Q_table).
 
 """
 
+evaluator = Evaluator()
+
 
 def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
     """
@@ -170,7 +172,9 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
     """
     Q_table = {}
     updates_to_Qsa = {}
-    rewards = []
+
+    evaluator.record_decay_rate(decay_rate)
+    evaluator.record_total_training_episodes(num_episodes)
 
     # YOUR CODE HERE
     for episode in tqdm(range(num_episodes)):
@@ -185,6 +189,14 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
         while not end_game:
             # epsilon-greedy action
             action = env.action_space.sample()  # take random action
+
+            # test
+            if state["at_heal"]:
+                evaluator.record_special_cell_counts("at_heal")
+
+            if state["guard_in_cell"]:
+                guard_name = new_state["guard_in_cell"]
+                evaluator.record_special_cell_counts(guard_name)
 
             if np.random.rand() >= epsilon:
                 max_Q = np.max(Q_table[state_id])
@@ -214,21 +226,24 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
             )
             # move to the new state
             state_id = new_state_id
+            state = new_state
+
             reward += new_reward
 
         # epsilon decays
         epsilon *= decay_rate
+        evaluator.records_rewards_during_training(reward)
+    
+    evaluator.record_q_table(Q_table)
 
-        rewards.append(reward)
-
-    return Q_table, rewards
+    return Q_table
 
 
 """
 Specify number of episodes and decay rate for training and evaluation.
 """
 
-num_episodes = 160000
+num_episodes = 1000
 decay_rate = 0.99999
 
 """
@@ -236,21 +251,9 @@ Run training if train_flag is set; otherwise, run evaluation using saved Q-table
 """
 
 if train_flag:
-    Q_table, rewards = Q_learning(
+    Q_table = Q_learning(
         num_episodes=num_episodes, gamma=0.9, epsilon=1, decay_rate=decay_rate
     )  # Run Q-learning
-
-    fold_size = 1000
-    folds = len(rewards) // fold_size
-    avg_rewards = [np.mean(rewards[i * fold_size : (i + 1) * fold_size]) for i in range(folds)]
-
-    plt.figure(figsize=(10,5))
-    plt.plot(range(folds), avg_rewards, marker='o')
-    plt.xlabel("Fold")
-    plt.ylabel("Average Reward")
-    plt.title("Average Reward per Fold of Episodes")
-    plt.xticks(range(folds))
-    plt.show()
 
     # Save the Q-table dict to a file
     with open("Q_table.pickle", "wb") as handle:
@@ -280,6 +283,8 @@ if not train_flag:
     )
     Q_table = np.load(filename, allow_pickle=True)
 
+    evaluator.record_q_table(Q_table)
+
     for episode in tqdm(range(10000)):
         obs, reward, done, info = env.reset()
         total_reward = 0
@@ -294,6 +299,7 @@ if not train_flag:
                 action = (
                     env.action_space.sample()
                 )  # Fallback to random action if state not in Q-table
+                evaluator.record_new_states_in_q_table(state, Q_table)
 
             obs, reward, done, info = env.step(action)
 
@@ -308,3 +314,11 @@ if not train_flag:
     avg_reward = sum(rewards) / len(rewards)
 
     print(f"\n{BOLD}Average reward over 10000 episodes: {avg_reward:.2f}{RESET}")
+
+# evaluator.plot_episode_reward_line_chart()
+print(evaluator.report_new_states_count())
+special_cell_summery = evaluator.report_special_cell_summery()
+for key in special_cell_summery:
+    print(f"{key}: {special_cell_summery[key]}")
+
+evaluator.plot_episode_reward_line_chart()
