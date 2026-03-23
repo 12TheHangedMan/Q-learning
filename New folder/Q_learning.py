@@ -55,21 +55,18 @@ class Evaluator:
         rewards = self.rewards
         folds = len(rewards) // fold_size
 
-        avg_rewards = [
-            np.mean(rewards[i * fold_size : (i + 1) * fold_size]) for i in range(folds)
-        ]
+        # avg_rewards = [
+        #     np.mean(rewards[i * fold_size : (i + 1) * fold_size])
+        #     for i in range(folds)
+        # ]
 
-        plt.figure(figsize=(10, 5))
-        plt.plot(range(folds), avg_rewards, marker="o")
-        plt.xlabel(f"Fold distance: (every {fold_size} episodes)")
-        plt.ylabel("Average Reward")
-        plt.title("Average Reward per Fold of Episodes")
-        plt.xticks(range(folds))
-        plt.show()
-
-    def plot_episode_reward_box_plot_chart(self, fold_size=500) -> None:
-        rewards = self.rewards
-        folds = len(rewards) // fold_size
+        # plt.figure(figsize=(10, 5))
+        # plt.plot(range(folds), avg_rewards, marker="o")
+        # plt.xlabel("Fold")
+        # plt.ylabel("Average Reward")
+        # plt.title("Average Reward per Fold of Episodes")
+        # plt.xticks(range(folds))
+        # plt.show()
 
         reward_groups = [
             rewards[i * fold_size : (i + 1) * fold_size] for i in range(folds)
@@ -80,7 +77,7 @@ class Evaluator:
         plt.figure(figsize=(12, 6))
         plt.boxplot(reward_groups)
 
-        plt.xlabel(f"Episode Fold (every {fold_size} episodes)")
+        plt.xlabel("Episode Fold")
         plt.ylabel("Reward")
         plt.title("Reward Distribution per Fold")
 
@@ -110,7 +107,7 @@ class Evaluator:
                 sum_w[row] += count
 
         avg_q = np.divide(sum_q, sum_w[:, None], where=sum_w[:, None] != 0)
-        return np.round(avg_q, 2)
+        return avg_q
 
     def report_summary(self) -> None:
         actions = ACTIONS
@@ -119,8 +116,6 @@ class Evaluator:
 
         df = pd.DataFrame(avg_q, index=rows, columns=actions)
         print(df)
-
-        # df.to_csv("summary.csv")
 
 
 # upload zipfile called upload.zip
@@ -372,8 +367,8 @@ def Q_learning(num_episodes=10000, gamma=0.9, epsilon=1, decay_rate=0.999):
 Specify number of episodes and decay rate for training and evaluation.
 """
 
-num_episodes = 120000
-decay_rate = 0.99999
+num_episodes = 1000
+decay_rate = 0.9999
 
 """
 Run training if train_flag is set; otherwise, run evaluation using saved Q-table.
@@ -413,16 +408,12 @@ if not train_flag:
     Q_table = np.load(filename, allow_pickle=True)
 
     evaluator.record_q_table(Q_table)
-    total_actions = 0
-    actions_from_unique_state = 0
 
     for episode in tqdm(range(10000)):
         obs, reward, done, info = env.reset()
         total_reward = 0
 
         while not done:
-            total_actions += 1
-
             state = hash(obs)
             try:
                 action = np.random.choice(
@@ -433,7 +424,6 @@ if not train_flag:
                     env.action_space.sample()
                 )  # Fallback to random action if state not in Q-table
                 evaluator.record_new_states_in_q_table(state, Q_table)
-                actions_from_unique_state += 1
 
             obs, reward, done, info = env.step(action)
 
@@ -443,27 +433,13 @@ if not train_flag:
                     obs, reward, done, info, delay=0.1
                 )  # Update the game screen [GUI only]
 
+        # print("Total reward:", total_reward)
         rewards.append(total_reward)
     avg_reward = sum(rewards) / len(rewards)
 
-    actions_from_unique_state_percentage = actions_from_unique_state / total_actions
-    avg_length = total_actions / 10000
+    print(f"\n{BOLD}Average reward over 10000 episodes: {avg_reward:.2f}{RESET}")
 
-    print(
-        f"\naverage length of an episode among the 10,000 evaluation episodes: {avg_length}"
-    )
-
-    print(f"{BOLD}Average reward over 10000 episodes: {avg_reward:.2f}{RESET}")
-
-    print(
-        f"unique_states_in_q_table: {evaluator.report_unique_states_in_q_table(Q_table)}"
-    )
-
-    print(f"new_states_count: {evaluator.report_new_states_count()}")
-    print(f"actions_from_unique_state_percentage: {actions_from_unique_state_percentage * 100: .2f}%")
-
-    # evaluator.report_summary()
-
-    # evaluator.plot_episode_reward_line_chart(fold_size=num_episodes//20)
-
-    # evaluator.plot_episode_reward_box_plot_chart(fold_size=num_episodes//20)
+# evaluator.plot_episode_reward_line_chart()
+print(evaluator.report_new_states_count())
+evaluator.plot_episode_reward_line_chart()
+evaluator.report_summary()
